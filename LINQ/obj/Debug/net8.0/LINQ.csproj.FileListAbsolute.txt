@@ -1,0 +1,5 @@
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net8.0\LINQ.GeneratedMSBuildEditorConfig.editorconfig
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net8.0\LINQ.AssemblyInfoInputs.cache
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net8.0\LINQ.AssemblyInfo.cs
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net8.0\LINQ.csproj.CoreCompileInputs.cache
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net8.0\LINQ.sourcelink.json
