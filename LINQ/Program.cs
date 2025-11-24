@@ -1,9 +1,5 @@
 ﻿using LINQ.Entities;
 using LINQ.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using static System.Reflection.Metadata.BlobBuilder;
 
 namespace LINQExercises;
 class Program
@@ -77,7 +73,7 @@ class Program
 
         // Q14. Find all employees who borrowed books from at least two different genres
         var mappedEmployees = ListGenerator.EmployeeList.ToDictionary(e => e.Id, e => e);
-          var mappedBooks = ListGenerator.BookList.ToDictionary(b => b.Id, b => b.Genre);
+          var genresById = ListGenerator.BookList.ToDictionary(b => b.Id, b => b.Genre);
 
 
           var groupedEmployees = ListGenerator.BookLoanList.GroupBy(b => b.EmployeeId);
@@ -88,7 +84,7 @@ class Program
           var EmployeeGenre = new HashSet<BookGenre>();
               foreach (var bookLoan in group)
               {
-                  mappedBooks.TryGetValue(bookLoan.BookId, out var genre);
+                genresById.TryGetValue(bookLoan.BookId, out var genre);
                   EmployeeGenre.Add(genre);
                  if (EmployeeGenre.Count >= 2)
                   {
@@ -166,7 +162,99 @@ class Program
         }
         #endregion
 
+        #region Advanced Grouping & Calculations (Q21-Q30)
+        // Q21. Find the employee with the highest total allocated project hours
+        var employeeWithMaxAllocatedHours = ListGenerator.EmployeeProjectList
+            .GroupBy(ep => ep.EmployeeId)
+            .Select(g => new
+            {
+                EmployeeId = g.Key,
+                HoursAllocated = g.Sum(ep => ep.HoursAllocated)
+            }
+            )
+            .OrderByDescending(ep => ep.HoursAllocated).FirstOrDefault();
 
+        // Q22. Get all employees whose total project hours exceed the company's average
+        var totals = ListGenerator.EmployeeProjectList
+           .GroupBy(ep => ep.EmployeeId)
+           .ToDictionary(
+               g => g.Key,
+               g => g.Sum(ep => ep.HoursAllocated)
+           );
 
+        var avgAllocatedHours = totals.Values.Average();
+
+        var employeesExceedingAvgHours = ListGenerator.EmployeeList
+            .Where(e => totals.TryGetValue(e.Id, out var hours) && hours > avgAllocatedHours);
+
+        // Q23. Return the top 3 book genres based on total borrowed count
+        var bookGenres = ListGenerator.BookList.ToDictionary(b => b.Id, b => b.Genre);
+
+        var topBookGenres = ListGenerator.BookLoanList
+            .Where(bl => bookGenres.ContainsKey(bl.BookId))          
+            .Select(bl => bookGenres[bl.BookId])                   
+            .GroupBy(genre => genre)
+            .Select(g => new { Genre = g.Key, BorrowedCount = g.Count() })
+            .OrderByDescending(g => g.BorrowedCount)
+            .Take(3)
+            .ToList();
+
+        // Q24.Find all employees who have never borrowed a book
+        var borrowedEmployeeIds = ListGenerator.BookLoanList.Select(bl => bl.EmployeeId).ToHashSet();
+        var employeesNeverBorrowed = ListGenerator.EmployeeList.Where(e => !borrowedEmployeeIds.Contains(e.Id)).ToList();
+
+        // Q25. Determine if all employees in the IT department are active
+        var allITActive = ListGenerator.EmployeeList
+            .Where(e => e.Department == Department.IT)
+            .All(e => e.IsActive);
+
+        //  Q26. Get the average rating of books borrowed by employees with more than 5 years of experience
+        var bookRating = ListGenerator.BookList.ToDictionary(b => b.Id, b => b.Rating);
+        var experiencedEmployeeIds = ListGenerator.EmployeeList
+            .Where(e => e.YearsOfExperience > 5 && borrowedEmployeeIds.Contains(e.Id)).Select(e => e.Id).ToHashSet();
+
+        var employeeAverageRating = ListGenerator.BookLoanList.Where(bl => experiencedEmployeeIds.Contains(bl.EmployeeId)).GroupBy(bl => bl.EmployeeId).Select(g => new
+        {
+            g.Key,
+            AverageRating = g.Average(bl => bookRating.GetValueOrDefault(bl.BookId))
+        }).ToList();
+
+        // Q27. Find the difference between the highest and lowest total project budgets
+        var minBudget = ListGenerator.ProjectList.Min(p => p.Budget);
+        var maxBudget = ListGenerator.ProjectList.Max(p => p.Budget);
+        var budgetDifference = maxBudget - minBudget;
+
+        // Q28. Retrieve the employees whose project hours fall within the top 10%
+        var totalHoursPerEmployee = ListGenerator.EmployeeProjectList.GroupBy(ep => ep.EmployeeId).Select(g => new
+        {
+            Employee = mappedEmployees.GetValueOrDefault(g.Key),
+            TotalHoursAllocated = g.Sum(ep => ep.HoursAllocated)
+        }).OrderByDescending(a => a.TotalHoursAllocated)
+          .ToList();
+
+        var topCount = (int)Math.Ceiling(totalHoursPerEmployee.Count * 0.1);
+        var top10Percent = totalHoursPerEmployee.Take(topCount);
+
+        // Q29. Return all books borrowed by employees working on 'AI' category projects
+        var projectCategories = ListGenerator.ProjectList.ToDictionary(p => p.Id, p => p.Category);
+
+        var aiEmployees = ListGenerator.EmployeeProjectList
+            .Where(ep => projectCategories[ep.ProjectId] == ProjectCategory.AI_ML)
+            .Select(ep => ep.EmployeeId)
+            .ToHashSet();
+
+        var booksById = ListGenerator.BookList.ToDictionary(b => b.Id, b => b);
+        var booksBorrowedByAIEmployees = ListGenerator.BookLoanList
+            .Where(bl => aiEmployees.Contains(bl.EmployeeId))
+            .Select(bl => booksById.GetValueOrDefault(bl.BookId))
+            .Where(book => book != null)
+            .ToList();
+
+        // Q30. Count how many customers have placed orders in both 2024 and 2025
+        var customersCountIn2024And2025 = ListGenerator.CustomerList.Count(c => 
+        c.Orders is not null &&
+        c.Orders.Any(o => o.Date.Year == 2024) && 
+        c.Orders.Any(o => o.Date.Year == 2025));
+        #endregion
     }
 }

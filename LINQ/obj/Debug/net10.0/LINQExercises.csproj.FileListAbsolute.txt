@@ -1,0 +1,15 @@
+D:\.NET Projects\LINQ\LINQ\bin\Debug\net10.0\LINQExercises.exe
+D:\.NET Projects\LINQ\LINQ\bin\Debug\net10.0\LINQExercises.deps.json
+D:\.NET Projects\LINQ\LINQ\bin\Debug\net10.0\LINQExercises.runtimeconfig.json
+D:\.NET Projects\LINQ\LINQ\bin\Debug\net10.0\LINQExercises.dll
+D:\.NET Projects\LINQ\LINQ\bin\Debug\net10.0\LINQExercises.pdb
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\LINQExercises.GeneratedMSBuildEditorConfig.editorconfig
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\LINQExercises.AssemblyInfoInputs.cache
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\LINQExercises.AssemblyInfo.cs
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\LINQExercises.csproj.CoreCompileInputs.cache
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\LINQExercises.sourcelink.json
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\LINQExercises.dll
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\refint\LINQExercises.dll
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\LINQExercises.pdb
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\LINQExercises.genruntimeconfig.cache
+D:\.NET Projects\LINQ\LINQ\obj\Debug\net10.0\ref\LINQExercises.dll
