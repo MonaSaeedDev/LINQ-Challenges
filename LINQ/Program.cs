@@ -247,7 +247,7 @@ class Program
         var booksBorrowedByAIEmployees = ListGenerator.BookLoanList
             .Where(bl => aiEmployees.Contains(bl.EmployeeId))
             .Select(bl => booksById.GetValueOrDefault(bl.BookId))
-            .Where(book => book != null)
+            .OfType<Book>()
             .ToList();
 
         // Q30. Count how many customers have placed orders in both 2024 and 2025
@@ -255,6 +255,114 @@ class Program
         c.Orders is not null &&
         c.Orders.Any(o => o.Date.Year == 2024) && 
         c.Orders.Any(o => o.Date.Year == 2025));
+        #endregion
+
+        #region Complex Filtering & Comparisons (Q31-Q40)
+        // Q31.Find employees who borrowed more books than the average borrowing count per employee
+        var employeesById = ListGenerator.EmployeeList.ToDictionary(e => e.Id, e => e);
+
+        var averageBorrowCount = ListGenerator.BookLoanList
+                .GroupBy(bl => bl.EmployeeId)
+                .Average(g => g.Count());
+
+        var employeesAboveAverage = ListGenerator.BookLoanList.GroupBy(bl => bl.EmployeeId)
+                .Where(g => g.Count() > averageBorrowCount)
+                .Select(g => employeesById.GetValueOrDefault(g.Key)).OfType<Employee>();
+
+        // Q32. Retrieve employees whose manager joined the company after them
+        var hireDates = ListGenerator.EmployeeList.ToDictionary(e => e.Id, e => e.HireDate);
+
+        var employeesWhoseManagerJoinedLater = ListGenerator.EmployeeList
+            .Where(e =>
+                e.ManagerId is not null &&
+                hireDates.ContainsKey(e.ManagerId.Value) &&
+                e.HireDate < hireDates[e.ManagerId.Value]).ToList();
+
+        // Q33. Find all books that were borrowed but never returned on time
+        var overdueBooks = ListGenerator.BookLoanList
+            .Where(bl => (bl.IsReturned && bl.ReturnDate > bl.DueDate) || (!bl.IsReturned && DateTime.Now > bl.DueDate))
+            .Select(bl => booksById.GetValueOrDefault(bl.BookId))
+            .OfType<Book>()
+            .ToList();
+
+        // Q34. Return all employees who have projects in two different categories
+        var employeesWithTwoOrMoreCategories = ListGenerator.EmployeeProjectList
+        .GroupBy(ep => ep.EmployeeId)
+        .Where(g =>
+            {
+                var categories = new HashSet<ProjectCategory>();
+                foreach (var ep in g)
+                {
+                    if (projectCategories.TryGetValue(ep.ProjectId, out var category))
+                        categories.Add(category);
+                }
+                return categories.Count >= 2;
+            })
+        .Select(g => employeesById.GetValueOrDefault(g.Key))
+        .OfType<Employee>()
+        .ToList();
+
+        // Q35. Calculate the ratio between completed and total projects
+        var total = ListGenerator.ProjectList.Count;
+        var completed = ListGenerator.ProjectList.Count(p => p.CompletionPercentage == 100.0);
+        var ratio = total == 0 ? 0 : (double)completed / total;
+
+        // Q36. Find the top 3 employees with the highest ratio of total hours to experience years
+        var experienceById = ListGenerator.EmployeeList.ToDictionary(e => e.Id, e => e.YearsOfExperience);
+
+        var totalHoursById = ListGenerator.EmployeeProjectList.GroupBy(ep => ep.EmployeeId)
+            .ToDictionary(g => g.Key, g => g.Sum(ep => ep.HoursAllocated));
+
+        var top3Employees = totalHoursById
+            .Where(kv => experienceById.GetValueOrDefault(kv.Key) > 0)
+            .OrderByDescending(g => (double)totalHoursById.GetValueOrDefault(g.Key) / experienceById.GetValueOrDefault(g.Key))
+            .Take(3)
+            .Select(g => employeesById.GetValueOrDefault(g.Key));
+
+        // Q37. Return all employees who borrowed all available 'Fantasy' books
+        var fantasyBooks = ListGenerator.BookList
+            .Where(b => b.IsAvailable && b.Genre == BookGenre.Fantasy)
+            .Select(b => b.Id)
+            .ToHashSet();
+
+        var employeesWhoBorrowedAllFantasy = ListGenerator.BookLoanList
+            .GroupBy(bl => bl.EmployeeId)
+            .Where(g => fantasyBooks.All(bookId => g.Any(bl => bl.BookId == bookId)))
+            .Select(g => employeesById.GetValueOrDefault(g.Key))
+            .OfType<Employee>()
+            .ToList();
+
+        // Q38. Find all employees who borrowed books in at least 3 different months
+        var employeesThreeMonthsOrMore = ListGenerator.BookLoanList.GroupBy(ep => ep.EmployeeId)
+            .Where(g => g.Select(bl => (bl.LoanDate.Year, bl.LoanDate.Month)).ToHashSet().Count >= 3)
+            .Select(g => employeesById.GetValueOrDefault(g.Key))
+            .OfType<Employee>()
+            .ToList();
+
+        // Q39. Return all projects that share at least one employee with another project
+        var projectsById = ListGenerator.ProjectList.ToDictionary(p => p.Id, p => p);
+
+        var grouped = ListGenerator.EmployeeProjectList.GroupBy(ep => ep.EmployeeId);
+
+        var sharedProjectIds = new HashSet<int>();
+
+        foreach (var group in grouped)
+        {
+            if (group.Skip(1).Any())  
+            {
+                foreach (var ep in group)
+                    sharedProjectIds.Add(ep.ProjectId);
+            }
+        }
+
+        var result = sharedProjectIds
+            .Select(pid => projectsById.GetValueOrDefault(pid))
+            .OfType<Project>()
+            .ToList();
+
+        // Q40. Find the employee with the earliest hire date who still manages others
+        var managers = ListGenerator.EmployeeList.Where(e => e.ManagerId is not null).Select(e => e.ManagerId!.Value).ToHashSet();
+        var earliestManager = ListGenerator.EmployeeList.Where(e => managers.Contains(e.Id)).OrderBy(e => e.HireDate).FirstOrDefault();
         #endregion
     }
 }
