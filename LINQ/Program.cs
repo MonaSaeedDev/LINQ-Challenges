@@ -1,6 +1,12 @@
 ﻿using LINQ.Entities;
 using LINQ.Enums;
+using System.Collections.Generic;
+using System.Diagnostics.Metrics;
+using System.Linq;
+using System.Net.Http.Headers;
+using System.Numerics;
 using static LINQ.Entities.ListGenerator;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LINQExercises;
 class Program
@@ -398,11 +404,11 @@ class Program
         // Q45. Find the intersection of employees who borrowed books and those who worked on projects
         var projectEmployeeIds = EmployeeProjectList
             .Select(ep => ep.EmployeeId)
-            .ToHashSet(); 
+            .ToHashSet();
 
         var employeesWhoBorrowedAndWorked = BookLoanList
-            .Select(bl => bl.EmployeeId)    
-            .Where(projectEmployeeIds.Contains) 
+            .Select(bl => bl.EmployeeId)
+            .Where(projectEmployeeIds.Contains)
             .Select(id => employeesById.GetValueOrDefault(id))
             .OfType<Employee>();
 
@@ -435,6 +441,227 @@ class Program
 
         // Q50. Aggregate all project budgets into a single summary string showing 'ProjectName:Budget'
         var projectBudgetSummary = string.Join(", ", ProjectList.Select(p => $"{p.Name}:{p.Budget:C}"));
+        #endregion
+
+        #region Orders & Customers (Q51-Q70)
+        // Q51.Find customers who have never placed an order
+        var customersWithoutOrders = CustomerList.Where(c => c.Orders == null || c.Orders.Length > 0).ToList();
+
+        // Q52. Find all orders with a total greater than the average order total
+        var averageTotal = OrderList.Average(o => o.Total);
+
+        var ordersAboveAverage = OrderList
+            .Where(o => o.Total > averageTotal)
+            .ToList();
+
+        // Q53. Get the most recent order placed by each customer
+        var mostRecentOrders = CustomerList
+            .Where(c => c.Orders != null && c.Orders.Length != 0)
+            .Select(c => new
+            {
+                Customer = c,
+                RecentOrder = c.Orders.OrderByDescending(o => o.Date).First()
+            }).ToList();
+
+        // Q54. Count how many products were ordered by each customer
+        var productsPerCustomer = CustomerList
+            .Select(c => new
+            {
+                Customer = c,
+                TotalProductsOrdered = c.Orders?.Sum(o => o.Products.Count) ?? 0
+            })
+            .ToList();
+
+        //Q55.Find the top 5 customers by total spending
+        var top5Customers = CustomerList
+            .Select(c => new
+            {
+                Customer = c,
+                TotalSpending = c.Orders?.Sum(o => o.Total) ?? 0
+            })
+            .OrderByDescending(c => c.TotalSpending)
+            .Take(5)
+            .ToList();
+
+        //Q56.Retrieve all orders that include at least one product from the 'Electronics' category
+        var electronicsOrders = OrderList
+            .Where(o => o.Products.Any(p => p.Category == "Electronics"))
+            .ToList();
+
+        //Q57.Calculate the average order total per country
+        var avgPerOrder = CustomerList
+          .GroupBy(c => c.Country)
+          .Select(g =>
+          {
+              decimal sum = 0;
+              int count = 0;
+
+              foreach (var c in g)
+              {
+                  if (c.Orders is not null)
+                      foreach (var o in c.Orders)
+                      {
+                          sum += o.Total;
+                          count++;
+                      }
+              }
+
+              return new
+              {
+                  Country = g.Key,
+                  AverageOrderTotal = count == 0 ? 0 : sum / count
+              };
+          })
+          .ToList();
+
+        //Q58.Find all customers who placed orders in December only
+        var decemberOnlyCustomers = CustomerList.Where(c => c.Orders.Length != 0 && c.Orders.All(o => o.Date.Month == 12));
+
+        // Q59. List all products that were never ordered (High-Performance Version)
+        var orderedProducts = new HashSet<Product>();
+
+        foreach (var order in OrderList)
+        {
+            foreach (var product in order.Products)
+            {
+                orderedProducts.Add(product);
+            }
+        }
+
+        var neverOrderedProducts = new List<Product>();
+
+        foreach (var product in ProductList)
+        {
+            if (!orderedProducts.Contains(product))
+                neverOrderedProducts.Add(product);
+        }
+
+        //Q60.Find all products where total sales(price × quantity sold) exceed 10,000
+        var sales = new Dictionary<long, decimal>();
+        foreach (var order in OrderList)
+        {
+            foreach (var product in order.Products)
+            {
+                if (sales.TryGetValue(product.Id, out var totalSales))
+                {
+                    sales[product.Id] = total + product.UnitPrice;
+                }
+                else
+                {
+                    sales[product.Id] = product.UnitPrice;
+                }
+            }
+        }
+
+        var highSellingProducts = ProductList.Where(p => sales.ContainsKey(p.Id) && sales[p.Id] > 10_000).ToList();
+
+        //Q61.Find the most frequently ordered product overall
+        var salesCount = new Dictionary<long, int>();
+        foreach (var order in OrderList)
+        {
+            foreach (var product in order.Products)
+            {
+                if (!salesCount.TryAdd(product.Id, 1))
+                {
+                    salesCount[product.Id]++;
+                }
+            }
+        }
+
+        var maxCount = sales.Values.Max();
+        var mostFrequentProducts = ProductList.FirstOrDefault(p => salesCount.TryGetValue(p.Id, out var count) && count == maxCount);
+
+        // Q62. Find customers who have ordered the same product more than once 
+        CustomerList
+            .Where(c => c.Orders != null && c.Orders.Length != 0)
+            .Where(c =>
+            {
+                var seenProductIds = new HashSet<long>();
+                return c.Orders
+                .Where(o => o.Products != null)
+                .SelectMany(o => o.Products)
+                .Any(p => !seenProductIds.Add(p.Id));
+            })
+            .ToList().ForEach(Console.WriteLine);
+
+        // Q63.Get the month with the highest number of orders
+        var topMonth = OrderList
+            .Where(o => o is not null && o.Products.Count != 0)
+            .GroupBy(o => (o.Date.Year, o.Date.Month))
+            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
+            .OrderByDescending(x => x.Count)
+            .FirstOrDefault();
+
+        // Q64. Retrieve the average number of items per order
+        var averageItemsPerOrder = OrderList
+            .Where(o => o is not null && o.Products.Count != 0)
+            .Average(o => o.Products.Count);
+
+        // Q65. Find the earliest and latest order dates for each customer
+        var orderDatesPerCustomer = CustomerList
+            .Where(c => c.Orders is not null && c.Orders.Length != 0)
+            .Select(c => new
+            {
+                Customer = c,
+                EarliestOrderDate = c.Orders.Min(o => o.Date),
+                LatestOrderDate = c.Orders.Max(o => o.Date)
+            })
+            .ToList();
+
+        // Q66. Find all orders placed on weekends
+        var weekendOrders = OrderList
+            .Where(o => o != null && o.Products.Count != 0)
+            .Where(o => o.Date.DayOfWeek == DayOfWeek.Saturday || o.Date.DayOfWeek == DayOfWeek.Sunday)
+            .ToList();
+
+        // Q67. Identify customers who placed orders in 2023 but not in 2024
+        var customers2023Not2024 = CustomerList
+            .Where(c => c.Orders != null
+                        && c.Orders.Any(o => o.Date.Year == 2023)
+                        && !c.Orders.Any(o => o.Date.Year == 2024)).ToList();
+
+        //  Q68. For each customer, calculate their average order value
+        var avgOrderValuePerCustomer = CustomerList
+            .Where(c => c.Orders is not null && c.Orders.Length != 0)
+            .Select(c => new
+            {
+                Customer = c,
+                AverageOrderValue = c.Orders.Average(o => o.Total)
+            })
+            .ToList();
+
+        //  Q69.Get the top 3 products per category by total sales
+        var productSalesCount = OrderList.SelectMany(o => o.Products).GroupBy(p => p.Id)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var totalSalesPerProduct = ProductList
+            .ToDictionary(
+                p => p.Id,
+                p => (Product: p, TotalSales: productSalesCount.GetValueOrDefault(p.Id) * p.UnitPrice)
+            );
+
+        var topProductsByCategoryOptimized = totalSalesPerProduct.Values
+            .GroupBy(x => x.Product.Category)
+            .Select(g => new
+            {
+                Category = g.Key,
+                Top3Products = g
+                    .OrderByDescending(x => x.TotalSales)
+                    .Take(3)
+                    .ToList()
+            })
+            .ToList();
+
+        //Q70.Calculate the total revenue per product category
+        var salesCountByProductId = OrderList.SelectMany(o => o.Products).GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.Count());
+
+        var revenuePerCategory = ProductList.GroupBy(p => p.Category)
+            .Select(g => new
+            {
+                Category = g.Key,
+                TotalRevenue = g.Sum(p => p.UnitPrice * salesCountByProductId.GetValueOrDefault(p.Id))
+            }).ToList();
+
         #endregion
     }
 }
