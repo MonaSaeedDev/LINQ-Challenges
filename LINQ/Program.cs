@@ -663,5 +663,88 @@ class Program
             }).ToList();
 
         #endregion
+
+        #region  Books & Library (Q71-Q80)
+        // Q71. Get all books never borrowed by anyone
+        var borrowedBookIds = BookLoanList.Select(bl => bl.BookId).ToHashSet();
+        var booksNeverBorrowed = BookList.Where(b => !borrowedBookIds.Contains(b.Id)).ToList();
+
+        //  Q72. Find all employees who borrowed books more than twice in the same month
+        var employeesBorrowedMoreThanTwice = BookLoanList
+            .GroupBy(bl => (bl.LoanDate.Year, bl.LoanDate.Month, bl.EmployeeId))
+            .Where(g => g.Count() > 2)
+            .Select(g => employeesById.GetValueOrDefault(g.Key.EmployeeId))
+            .OfType<Employee>()
+            .Distinct()
+            .ToList();
+
+        // Q73. Calculate the most popular genre among borrowed books
+        var mostPopularGenreInfo = BookLoanList
+        .Where(bl => bookGenres.ContainsKey(bl.BookId))
+        .GroupBy(bl => bookGenres[bl.BookId])
+        .Select(g => new
+        {
+            Genre = g.Key,
+            BorrowCount = g.Count()
+        })
+        .MaxBy(x => x.BorrowCount);
+
+        var mostPopularGenre = mostPopularGenreInfo?.Genre;
+
+        // Q74. Find books borrowed by at least 5 unique employees
+        var booksBorrowedByAtLeast5Employees = BookLoanList
+            .GroupBy(bl => bl.BookId)
+            .Where(g => g.Select(bl => bl.EmployeeId).Distinct().Count() >= 5)
+            .Select(g => booksById.GetValueOrDefault(g.Key))
+            .OfType<Book>()
+            .ToList();
+
+        //  Q75. Determine the average loan duration for returned books
+        var averageLoanDuration = BookLoanList
+            .Where(bl => bl.IsReturned && bl.ReturnDate.HasValue)
+            .Average(bl => (bl.ReturnDate!.Value - bl.LoanDate).TotalDays);
+
+        // Q76. Get all employees who returned a book after more than 30 days
+        var employeesWithLateReturns = BookLoanList
+            .Where(bl => bl.IsReturned
+            && bl.ReturnDate.HasValue
+            && (bl.ReturnDate.Value - bl.LoanDate).TotalDays > 30)
+            .Select(bl => employeesById.GetValueOrDefault(bl.EmployeeId))
+            .OfType<Employee>()  
+            .Distinct()        
+            .ToList();
+
+        // Q77. Find the month with the highest number of late returns
+        var monthWithMostLateReturns = BookLoanList.Where(bl => bl.IsReturned
+            && bl.ReturnDate.HasValue
+            && bl.ReturnDate.Value > bl.DueDate) // .Value
+            .GroupBy(bl => (bl.ReturnDate!.Value.Year, bl.ReturnDate!.Value.Month))
+            .MaxBy(g => g.Count())?.Key.Month;
+
+        // Q78. Find employees who borrowed books of only one genre
+        var employeesSingleGenre = BookLoanList.GroupBy(bl => bl.EmployeeId)
+            .Select(g => new
+            {
+                EmployeeId = g.Key,
+                Genres = g.Select(bl => bookGenres.GetValueOrDefault(bl.BookId)).OfType<BookGenre>().ToHashSet()
+            }).Where(x => x.Genres.Count == 1)
+            .Select(x => employeesById.GetValueOrDefault(x.EmployeeId))
+            .OfType<Employee>()
+            .ToList();
+
+        // Q79. Calculate the total number of currently borrowed books (not returned)
+        var totalCurrentlyBorrowedBooks = BookLoanList
+            .Count(bl => !bl.IsReturned && !bl.ReturnDate.HasValue);
+
+        //  Q80. Find all employees who borrowed books in both 2023 and 2024
+        var employeesBorrowedInBothYears = BookLoanList
+            .Where(bl => bl.LoanDate.Year == 2023 || bl.LoanDate.Year == 2024)
+            .GroupBy(bl => bl.EmployeeId)
+            .Where(g => g.Any(bl => bl.LoanDate.Year == 2023) && g.Any(bl => bl.LoanDate.Year == 2024))
+            .Select(g => employeesById.GetValueOrDefault(g.Key)) 
+            .OfType<Employee>()
+            .ToList();
+
+        #endregion
     }
 }
