@@ -710,8 +710,8 @@ class Program
             && bl.ReturnDate.HasValue
             && (bl.ReturnDate.Value - bl.LoanDate).TotalDays > 30)
             .Select(bl => employeesById.GetValueOrDefault(bl.EmployeeId))
-            .OfType<Employee>()  
-            .Distinct()        
+            .OfType<Employee>()
+            .Distinct()
             .ToList();
 
         // Q77. Find the month with the highest number of late returns
@@ -741,9 +741,84 @@ class Program
             .Where(bl => bl.LoanDate.Year == 2023 || bl.LoanDate.Year == 2024)
             .GroupBy(bl => bl.EmployeeId)
             .Where(g => g.Any(bl => bl.LoanDate.Year == 2023) && g.Any(bl => bl.LoanDate.Year == 2024))
-            .Select(g => employeesById.GetValueOrDefault(g.Key)) 
+            .Select(g => employeesById.GetValueOrDefault(g.Key))
             .OfType<Employee>()
             .ToList();
+
+        #endregion
+
+        #region Employees & Departments (Q81-Q90)
+        // Q81. Find all employees whose salary is below the department average
+        var employeesBelowDeptAverage = EmployeeList.GroupBy(e => e.Department)
+            .SelectMany(g =>
+            {
+                var AverageSalary = g.Select(e => e.Salary).Average();
+                return g.Where(e => e.Salary < AverageSalary);
+            }).ToList();
+
+        // Q82. Find departments with more than 10 employees
+        var departmentsWithMoreThan10 = EmployeeList
+            .GroupBy(e => e.Department)
+            .Where(g => g.Count() > 10)
+            .Select(g => g.Key)
+            .ToList();
+
+        // Q83. Get the highest paid employee in each department
+        var highestPaidPerDept = EmployeeList
+            .GroupBy(e => e.Department)
+            .Select(g => g.MaxBy(e => e.Salary));
+
+        //  Q84. Find employees who joined in the same year as their manager
+        var employeesWithSameHireYearAsManager = EmployeeList
+            .Where(e => e.ManagerId.HasValue &&
+            employeesById.TryGetValue(e.ManagerId.Value, out var manager) &&
+            e.HireDate.Year == manager.HireDate.Year).ToList();
+
+        //  Q85. Count the number of employees hired each year
+        var employeesHiredPerYear = EmployeeList.GroupBy(e => e.HireDate.Year).Select(g => new
+        {
+            Year = g.Key,
+            Count = g.Count()
+        }).ToList();
+
+        // Q86. Retrieve employees who have never worked on any project
+        var employeesWithProjects = EmployeeProjectList
+             .Select(ep => ep.EmployeeId)
+             .ToHashSet();
+
+        var employeesWithoutProjects = EmployeeList
+            .Where(e => !employeesWithProjects.Contains(e.Id))
+            .ToList();
+
+        // Q87. Find the department with the highest total salary cost
+        var departmentWithHighestSalaryCost = EmployeeList.GroupBy(e => e.Department)
+          .MaxBy(g => g.Sum(e => e.Salary))?.Key;
+
+        // Q88. Get all employees whose experience exceeds 10 years and who manage others
+        var managerIds = EmployeeList
+            .Where(e => e.ManagerId.HasValue)
+            .Select(e => e.ManagerId!.Value)
+            .ToHashSet();
+
+        var experiencedManagers = EmployeeList
+            .Where(e => e.YearsOfExperience > 10 && managerIds.Contains(e.Id))
+            .ToList();
+
+        //  Q89. List employees who have no subordinates and no projects
+        var employeesWithoutSubordinatesOrProjects = EmployeeList
+            .Where(e => !managerIds.Contains(e.Id) && !projectEmployeeIds.Contains(e.Id))
+            .ToList();
+
+        // Q90. Find employees who were promoted (i.e., salary increased) — assume a list of SalaryHistory
+      /*  var promotedEmployeeIds = SalaryHistory
+             .GroupBy(s => s.EmployeeId)
+             .Where(g => g.Max(s => s.Salary) != g.Min(s => s.Salary))
+             .Select(g => g.Key)
+             .ToHashSet();
+
+        var promotedEmployees = EmployeeList
+            .Where(e => promotedEmployeeIds.Contains(e.Id))
+            .ToList();*/
 
         #endregion
     }

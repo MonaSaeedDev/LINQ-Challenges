@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LINQExercises")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6cf6a232be72dd584e8448d77e390540d32fd5aa")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+36a21e1d91e5d057007d28b51e5772a71cdf30d4")]
 [assembly: System.Reflection.AssemblyProductAttribute("LINQExercises")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LINQExercises")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
