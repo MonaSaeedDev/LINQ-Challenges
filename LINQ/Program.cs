@@ -250,7 +250,7 @@ class Program
             .Select(ep => ep.EmployeeId)
             .ToHashSet();
 
-        var booksById = BookList.ToDictionary(b => b.Id, b => b);
+        var booksById = BookList.ToDictionary(b => b.Id);
         var booksBorrowedByAIEmployees = BookLoanList
             .Where(bl => aiEmployees.Contains(bl.EmployeeId))
             .Select(bl => booksById.GetValueOrDefault(bl.BookId))
@@ -266,7 +266,7 @@ class Program
 
         #region Complex Filtering & Comparisons (Q31-Q40)
         // Q31.Find employees who borrowed more books than the average borrowing count per employee
-        var employeesById = EmployeeList.ToDictionary(e => e.Id, e => e);
+        var employeesById = EmployeeList.ToDictionary(e => e.Id);
 
         var averageBorrowCount = BookLoanList
                 .GroupBy(bl => bl.EmployeeId)
@@ -347,7 +347,7 @@ class Program
             .ToList();
 
         // Q39. Return all projects that share at least one employee with another project
-        var projectsById = ProjectList.ToDictionary(p => p.Id, p => p);
+        var projectsById = ProjectList.ToDictionary(p => p.Id);
 
         var grouped = EmployeeProjectList.GroupBy(ep => ep.EmployeeId);
 
@@ -810,16 +810,141 @@ class Program
             .ToList();
 
         // Q90. Find employees who were promoted (i.e., salary increased) — assume a list of SalaryHistory
-      /*  var promotedEmployeeIds = SalaryHistory
-             .GroupBy(s => s.EmployeeId)
-             .Where(g => g.Max(s => s.Salary) != g.Min(s => s.Salary))
-             .Select(g => g.Key)
+        /*  var promotedEmployeeIds = SalaryHistory
+               .GroupBy(s => s.EmployeeId)
+               .Where(g => g.Max(s => s.Salary) != g.Min(s => s.Salary))
+               .Select(g => g.Key)
+               .ToHashSet();
+
+          var promotedEmployees = EmployeeList
+              .Where(e => promotedEmployeeIds.Contains(e.Id))
+              .ToList();*/
+
+        #endregion
+
+        #region Projects & Assignments (Q91-Q100)
+        // Q91. Find projects that started and ended in the same year
+        var projectsSameYear = ProjectList
+            .Where(p => p.EndDate.HasValue && p.StartDate.Year == p.EndDate.Value.Year)
+            .ToList();
+
+        // Q92. Find the average number of employees per project
+        var averageEmployeesPerProject = EmployeeProjectList
+            .GroupBy(ep => ep.ProjectId)
+            .Select(g => g.Count())
+            .DefaultIfEmpty(0)
+            .Average();
+
+        // Q93. Get all projects with no assigned employees
+        var assignedProjectIds = EmployeeProjectList
+             .Select(ep => ep.ProjectId)
              .ToHashSet();
 
-        var promotedEmployees = EmployeeList
-            .Where(e => promotedEmployeeIds.Contains(e.Id))
-            .ToList();*/
+        var projectsWithNoEmployees = ProjectList
+            .Where(p => !assignedProjectIds.Contains(p.Id))
+            .ToList();
 
+        // Q94. Find the most common project category
+        var mostCommonCategory = ProjectList
+            .GroupBy(p => p.Category)
+            .MaxBy(g => g.Count())?
+            .Key;
+
+        // Q95. Calculate the average duration (in days) of all projects
+        var averageDuration = ProjectList
+            .Where(p => p.EndDate.HasValue)
+            .Average(p => (p.EndDate!.Value - p.StartDate).TotalDays);
+
+        // Q96. Find employees who worked on more than 3 projects simultaneously
+
+        // Sweep-line algorithm to track active events and efficiently find overlaps or intersections.
+        var employeesWorkedOnMoreThan3Simultaneously = EmployeeProjectList
+            .GroupBy(ep => ep.EmployeeId)
+            .Where(g =>
+            {
+                var events = g
+                    .Select(ep =>
+                    {
+                        if (!projectsById.TryGetValue(ep.ProjectId, out var project))
+                            return null; 
+
+                        return new
+                        {
+                            Start = ep.AssignedDate,
+                            End = project.EndDate ?? DateTime.MaxValue
+                        };
+                    })
+                    .Where(p => p != null) 
+                    .SelectMany(p => new[]
+                    {
+                        new { Time = p!.Start, IsStart = true },
+                        new { Time = p!.End,   IsStart = false }
+                    })
+                    .OrderBy(e => e.Time)
+                    .ThenBy(e => !e.IsStart)
+                    .ToList();
+
+                int active = 0;
+                int maxActive = 0;
+
+                foreach (var ev in events)
+                {
+                    if (ev.IsStart)
+                        active++;
+                    else
+                        active--;
+
+                    maxActive = Math.Max(maxActive, active);
+                }
+
+                return maxActive > 3;
+            })
+            .Select(g => employeesById.GetValueOrDefault(g.Key)) 
+            .OfType<Employee>() 
+            .ToList();
+
+        // Q97. Get projects where all employees have more than 5 years' experience
+        var projectsWithExperiencedTeams = EmployeeProjectList
+            .GroupBy(ep => ep.ProjectId)
+            .Where(g => g.All(ep => employeesById.TryGetValue(ep.EmployeeId, out var employee) &&
+            employee.YearsOfExperience > 5))
+            .Select(g => projectsById.GetValueOrDefault(g.Key))
+            .OfType<Project>();
+
+        // Q98. Find projects whose budgets exceed the average budget for their category
+        var projectsAboveCategoryAverage = ProjectList
+            .GroupBy(p => p.Category)
+            .SelectMany(g =>
+            {
+                var averageBudget = g.Average(p => p.Budget);
+                return g.Where(p => p.Budget > averageBudget).ToList();
+            })
+            .Select(p => projectsById.GetValueOrDefault(p.Id))
+            .OfType<Project>()
+            .ToList();
+
+        //  Q99. Find all categories with at least one project completed in under 10 days
+        var fastCompletedCategories = ProjectList
+            .Where(p => p.IsCompleted &&
+                        p.CompletionPercentage == 100.0 &&
+                        p.EndDate.HasValue &&
+                        (p.EndDate.Value - p.StartDate).TotalDays < 10)
+            .Select(p => p.Category)
+            .Distinct()
+            .ToList();
+
+        //  Q100. Return employees who have worked on both active and completed projects
+        var employeesWorkedOnBoth = EmployeeProjectList
+            .GroupBy(ep => ep.EmployeeId)
+            .Where(g => 
+            {
+                bool hasActive = g.Any(ep => ep.IsActive);
+                bool hasCompleted = g.Any(ep => projectsById.TryGetValue(ep.ProjectId, out var p) && p.IsCompleted && p.CompletionPercentage == 100.0);
+                return hasActive && hasCompleted;
+            })
+            .Select(g => employeesById.GetValueOrDefault(g.Key))
+            .OfType<Employee>() 
+            .ToList();
         #endregion
     }
 }
